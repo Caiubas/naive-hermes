@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+// 5 - Alertas
+enum AlertType {
+    LOW_BATTERY = 0;
+    KICKER_OVERVOLTAGE = 1;
+}
+
+// 0 - Comandos do Computador
+message MotionCommand {
+    float vel_x = 1;
+    float vel_y = 2;
+    float vel_w = 3;
+    uint32 kick_h = 4;
+    uint32 kick_v = 5;
+}
+
+// 1 - Comando de Configuração
+message ConfigCommand {
+    uint32 param_id = 1;
+    float value = 2;
+    string text_value = 3;
+}
+
+// 2 - Solicitar Informação
+message InfoRequest {
+    uint32 info_index = 1;
+}
+
+// 3 - Retorno de Informação
+message InfoResponse {
+    uint32 info_index = 1;
+    float value = 2;       // Usaremos para o Bool (0.0 ou 1.0)
+    string text_value = 3;  // Usaremos para IP e MAC
+}
+
+// 4 - Telemetria
+message Telemetry {
+    repeated float wheel_speeds = 1;
+    repeated float kicker_voltages = 2;
+    float battery_voltage = 3;
+    bool ball_sensor = 4;
+}
+
+// MENSAGEM PRINCIPAL (Wrapper)
+message RobotPacket {
+    uint32 robot_id = 1;
+    oneof payload {
+        MotionCommand motion = 2;
+        ConfigCommand config = 3;
+        InfoRequest request = 4;
+        InfoResponse response = 5;
+        Telemetry telemetry = 6;
+        AlertType alert = 7;
+    }
+}
