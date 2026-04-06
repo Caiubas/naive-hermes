@@ -90,7 +90,7 @@ class RobotInterface:
 class RobotDashboard(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("Controle de Frota - Naive Caronte")
+        self.title("Controle de Frota - Naive Hermes")
         self.geometry("1100x900")
         ctk.set_appearance_mode("dark")
 
