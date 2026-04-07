@@ -146,10 +146,16 @@ class RobotDashboard(ctk.CTk):
         # --- TELEMETRIA ---
         tele_f = ctk.CTkFrame(panel, fg_color="transparent")
         tele_f.pack(fill="x", padx=20)
+
         lbl_bat = ctk.CTkLabel(tele_f, text="🔋 Bateria: -- V")
         lbl_bat.grid(row=0, column=0, sticky="w", padx=(0, 20))
+
         lbl_ball = ctk.CTkLabel(tele_f, text="⚽ Sensor: --")
-        lbl_ball.grid(row=0, column=1, sticky="w")
+        lbl_ball.grid(row=0, column=1, sticky="w", padx=(0, 20))  # Adicionado padding à direita
+
+        # NOVO: Label para velocidades das rodas
+        lbl_wheels = ctk.CTkLabel(tele_f, text="⚙️ Rodas: [--]")
+        lbl_wheels.grid(row=0, column=2, sticky="w")
 
         # --- CONFIGURAÇÃO E REQUESTS ---
         actions_f = ctk.CTkFrame(panel, fg_color="transparent")
@@ -178,7 +184,7 @@ class RobotDashboard(ctk.CTk):
 
         ctk.CTkLabel(drive_f, text="🎮 CONDUÇÃO WASD", font=("Roboto", 11, "bold")).grid(row=0, column=0, padx=10)
         ctk.CTkLabel(drive_f, text="Vel Max:").grid(row=0, column=1, padx=5)
-        ent_speed = ctk.CTkEntry(drive_f, width=50);
+        ent_speed = ctk.CTkEntry(drive_f, width=50)
         ent_speed.insert(0, "1.5")
         ent_speed.grid(row=0, column=2, padx=5)
 
@@ -188,8 +194,9 @@ class RobotDashboard(ctk.CTk):
         switch_drive = ctk.CTkSwitch(drive_f, text="Ativar Teclado", command=lambda: self._toggle_drive(robot_id))
         switch_drive.grid(row=0, column=4, padx=10)
 
+        # NOVO: Adicionando lbl_wheels ao dicionário de UI do robô
         self.robots_ui[robot_id] = {
-            "lbl_bat": lbl_bat, "lbl_ball": lbl_ball, "lbl_resp": lbl_resp,
+            "lbl_bat": lbl_bat, "lbl_ball": lbl_ball, "lbl_wheels": lbl_wheels, "lbl_resp": lbl_resp,
             "ent_speed": ent_speed, "lbl_current_v": lbl_curr, "switch_drive": switch_drive,
             "is_driving": False
         }
@@ -236,7 +243,7 @@ class RobotDashboard(ctk.CTk):
         except:
             pass
 
-        self.after(50, lambda: self._drive_loop(robot_id))
+        self.after(20, lambda: self._drive_loop(robot_id))
 
     def process_queue(self):
         while not self.msg_queue.empty():
@@ -250,10 +257,20 @@ class RobotDashboard(ctk.CTk):
     def _update_ui_from_packet(self, packet):
         ui = self._get_or_create_robot_panel(packet.robot_id)
         ptype = packet.WhichOneof("payload")
+
         if ptype == 'telemetry':
             t = packet.telemetry
             ui["lbl_bat"].configure(text=f"🔋 Bateria: {getattr(t, 'battery_voltage', 0.0):.2f} V")
-            ui["lbl_ball"].configure(text=f"⚽ Sensor: {'🟢 Sim' if getattr(t, 'sensor_bola', False) else '🔴 Não'}")
+            ui["lbl_ball"].configure(text=f"⚽ Sensor: {'🟢 Sim' if getattr(t, 'ball_sensor', False) else '🔴 Não'}")
+
+            # NOVO: Processamento do repeated float wheel_speeds
+            wheels = list(t.wheel_speeds)  # em vez de getattr(t, 'wheel_speeds', [])
+            if wheels:
+                wheels_str = ", ".join([f"{w:.2f}" for w in wheels])
+                ui["lbl_wheels"].configure(text=f"⚙️ Rodas: [{wheels_str}]")
+            else:
+                ui["lbl_wheels"].configure(text="⚙️ Rodas: [--]")
+
         elif ptype == 'response':
             r = packet.response
             v = r.text_value if r.text_value else str(getattr(r, 'value', ''))
