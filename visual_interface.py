@@ -94,8 +94,8 @@ class RobotDashboard(ctk.CTk):
         self.geometry("1100x900")
         ctk.set_appearance_mode("dark")
 
-        # Mapeamento de teclas WASD
-        self.keys_pressed = {"w": False, "a": False, "s": False, "d": False}
+        # Mapeamento de teclas WASDQE
+        self.keys_pressed = {"w": False, "a": False, "s": False, "d": False, "q": False, "e": False}
         self.bind("<KeyPress>", self._on_key_press)
         self.bind("<KeyRelease>", self._on_key_release)
 
@@ -188,7 +188,7 @@ class RobotDashboard(ctk.CTk):
         ent_speed.insert(0, "1.5")
         ent_speed.grid(row=0, column=2, padx=5)
 
-        lbl_curr = ctk.CTkLabel(drive_f, text="Vx: 0.0 | Vy: 0.0", text_color="#777777")
+        lbl_curr = ctk.CTkLabel(drive_f, text="Vx: 0.0 | Vy: 0.0 | Vw: 0.0", text_color="#777777")
         lbl_curr.grid(row=0, column=3, padx=15)
 
         switch_drive = ctk.CTkSwitch(drive_f, text="Ativar Teclado", command=lambda: self._toggle_drive(robot_id))
@@ -220,14 +220,14 @@ class RobotDashboard(ctk.CTk):
         ui = self.robots_ui.get(robot_id)
         if not ui or not ui["is_driving"]:
             self.network.send_motion_command(robot_id, 0, 0, 0)
-            if ui: ui["lbl_current_v"].configure(text="Vx: 0.0 | Vy: 0.0")
+            if ui: ui["lbl_current_v"].configure(text="Vx: 0.0 | Vy: 0.0 | Vw: 0.0")
             return
 
         try:
             max_s = float(ui["ent_speed"].get())
-            vx, vy = 0.0, 0.0
+            vx, vy, vw = 0.0, 0.0, 0.0
 
-            # Lógica solicitada:
+            # Lógica Linear (WASD)
             if self.keys_pressed["w"]:
                 vx = max_s
             elif self.keys_pressed["s"]:
@@ -238,8 +238,17 @@ class RobotDashboard(ctk.CTk):
             elif self.keys_pressed["a"]:
                 vy = -max_s
 
-            self.network.send_motion_command(robot_id, vx, vy, 0)
-            ui["lbl_current_v"].configure(text=f"Vx: {vx:.1f} | Vy: {vy:.1f}")
+            # Lógica Angular (QE)
+            if self.keys_pressed["q"]:
+                vw = max_s
+            elif self.keys_pressed["e"]:
+                vw = -max_s
+
+            # Envia o comando com Vx, Vy e Vw
+            self.network.send_motion_command(robot_id, vx, vy, vw)
+
+            # Atualiza a interface
+            ui["lbl_current_v"].configure(text=f"Vx: {vx:.1f} | Vy: {vy:.1f} | Vw: {vw:.1f}")
         except:
             pass
 
