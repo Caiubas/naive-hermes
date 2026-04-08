@@ -32,7 +32,6 @@ class RobotInterface:
         packet.motion.vel_x = float(vx)
         packet.motion.vel_y = float(vy)
         packet.motion.vel_w = float(vw)
-        # Garantindo inteiros para os kicks para evitar TypeError
         packet.motion.kick_h = int(kick_h)
         packet.motion.kick_v = int(kick_v)
         self._send_udp_packet(packet)
@@ -86,6 +85,9 @@ class RobotInterface:
                 except:
                     break
 
+    def broadcast_TCP_IP(self, ip: str):
+        self.send_config_command(0xFF, 1, ip)
+
 
 class RobotDashboard(ctk.CTk):
     def __init__(self):
@@ -94,7 +96,6 @@ class RobotDashboard(ctk.CTk):
         self.geometry("1100x900")
         ctk.set_appearance_mode("dark")
 
-        # Mapeamento de teclas WASDQE
         self.keys_pressed = {"w": False, "a": False, "s": False, "d": False, "q": False, "e": False}
         self.bind("<KeyPress>", self._on_key_press)
         self.bind("<KeyRelease>", self._on_key_release)
@@ -122,10 +123,25 @@ class RobotDashboard(ctk.CTk):
     def _build_header(self):
         header_frame = ctk.CTkFrame(self, corner_radius=10)
         header_frame.pack(fill="x", padx=20, pady=(20, 10))
+
         ctk.CTkLabel(header_frame, text="Adicionar Robô (ID):").pack(side="left", padx=15, pady=15)
         self.entry_new_robot = ctk.CTkEntry(header_frame, width=80)
         self.entry_new_robot.pack(side="left", padx=10)
         ctk.CTkButton(header_frame, text="Adicionar Painel", command=self._add_robot_manual).pack(side="left", padx=10)
+
+        # Separador visual
+        ctk.CTkLabel(header_frame, text="|", text_color="gray").pack(side="left", padx=10)
+
+        # Campo de IP e botão de broadcast
+        ctk.CTkLabel(header_frame, text="IP TCP:").pack(side="left", padx=(5, 5), pady=15)
+        self.entry_tcp_ip = ctk.CTkEntry(header_frame, width=130, placeholder_text="192.168.0.100")
+        self.entry_tcp_ip.pack(side="left", padx=5)
+        ctk.CTkButton(header_frame, text="Broadcast IP", command=self._broadcast_tcp_ip).pack(side="left", padx=10)
+
+    def _broadcast_tcp_ip(self):
+        ip = self.entry_tcp_ip.get().strip()
+        if ip:
+            self.network.broadcast_TCP_IP(ip)
 
     def _add_robot_manual(self):
         robot_id = self.entry_new_robot.get()
@@ -151,9 +167,8 @@ class RobotDashboard(ctk.CTk):
         lbl_bat.grid(row=0, column=0, sticky="w", padx=(0, 20))
 
         lbl_ball = ctk.CTkLabel(tele_f, text="⚽ Sensor: --")
-        lbl_ball.grid(row=0, column=1, sticky="w", padx=(0, 20))  # Adicionado padding à direita
+        lbl_ball.grid(row=0, column=1, sticky="w", padx=(0, 20))
 
-        # NOVO: Label para velocidades das rodas
         lbl_wheels = ctk.CTkLabel(tele_f, text="⚙️ Rodas: [--]")
         lbl_wheels.grid(row=0, column=2, sticky="w")
 
@@ -161,7 +176,6 @@ class RobotDashboard(ctk.CTk):
         actions_f = ctk.CTkFrame(panel, fg_color="transparent")
         actions_f.pack(fill="x", padx=20, pady=5)
 
-        # Request
         cb_req = ctk.CTkOptionMenu(actions_f, values=list(self.info_options.keys()), width=140)
         cb_req.grid(row=0, column=0, padx=5, pady=2)
         ctk.CTkButton(actions_f, text="Request", width=70,
@@ -170,7 +184,6 @@ class RobotDashboard(ctk.CTk):
         lbl_resp = ctk.CTkLabel(actions_f, text="Resp: --", text_color="gray")
         lbl_resp.grid(row=0, column=2, padx=10)
 
-        # Config
         cb_conf = ctk.CTkOptionMenu(actions_f, values=list(self.config_options.keys()), width=140)
         cb_conf.grid(row=1, column=0, padx=5, pady=2)
         ent_conf = ctk.CTkEntry(actions_f, placeholder_text="valor", width=100)
@@ -178,7 +191,7 @@ class RobotDashboard(ctk.CTk):
         ctk.CTkButton(actions_f, text="Set Config", width=80,
                       command=lambda: self._send_config(robot_id, cb_conf.get(), ent_conf.get())).grid(row=1, column=2)
 
-        # --- MODO CONDUÇÃO (Lógica solicitada) ---
+        # --- MODO CONDUÇÃO ---
         drive_f = ctk.CTkFrame(panel, fg_color="#2b2b2b", corner_radius=10)
         drive_f.pack(fill="x", padx=20, pady=(5, 15))
 
@@ -194,7 +207,6 @@ class RobotDashboard(ctk.CTk):
         switch_drive = ctk.CTkSwitch(drive_f, text="Ativar Teclado", command=lambda: self._toggle_drive(robot_id))
         switch_drive.grid(row=0, column=4, padx=10)
 
-        # NOVO: Adicionando lbl_wheels ao dicionário de UI do robô
         self.robots_ui[robot_id] = {
             "lbl_bat": lbl_bat, "lbl_ball": lbl_ball, "lbl_wheels": lbl_wheels, "lbl_resp": lbl_resp,
             "ent_speed": ent_speed, "lbl_current_v": lbl_curr, "switch_drive": switch_drive,
@@ -227,7 +239,6 @@ class RobotDashboard(ctk.CTk):
             max_s = float(ui["ent_speed"].get())
             vx, vy, vw = 0.0, 0.0, 0.0
 
-            # Lógica Linear (WASD)
             if self.keys_pressed["w"]:
                 vx = max_s
             elif self.keys_pressed["s"]:
@@ -238,16 +249,12 @@ class RobotDashboard(ctk.CTk):
             elif self.keys_pressed["a"]:
                 vy = -max_s
 
-            # Lógica Angular (QE)
             if self.keys_pressed["q"]:
                 vw = max_s
             elif self.keys_pressed["e"]:
                 vw = -max_s
 
-            # Envia o comando com Vx, Vy e Vw
             self.network.send_motion_command(robot_id, vx, vy, vw)
-
-            # Atualiza a interface
             ui["lbl_current_v"].configure(text=f"Vx: {vx:.1f} | Vy: {vy:.1f} | Vw: {vw:.1f}")
         except:
             pass
@@ -272,8 +279,7 @@ class RobotDashboard(ctk.CTk):
             ui["lbl_bat"].configure(text=f"🔋 Bateria: {getattr(t, 'battery_voltage', 0.0):.2f} V")
             ui["lbl_ball"].configure(text=f"⚽ Sensor: {'🟢 Sim' if getattr(t, 'ball_sensor', False) else '🔴 Não'}")
 
-            # NOVO: Processamento do repeated float wheel_speeds
-            wheels = list(t.wheel_speeds)  # em vez de getattr(t, 'wheel_speeds', [])
+            wheels = list(t.wheel_speeds)
             if wheels:
                 wheels_str = ", ".join([f"{w:.2f}" for w in wheels])
                 ui["lbl_wheels"].configure(text=f"⚙️ Rodas: [{wheels_str}]")
@@ -289,12 +295,9 @@ class RobotDashboard(ctk.CTk):
 if __name__ == "__main__":
     app = RobotDashboard()
 
-
-    # Cleanup ao fechar
     def on_close():
         app.network.running = False
         app.destroy()
-
 
     app.protocol("WM_DELETE_WINDOW", on_close)
     app.mainloop()
